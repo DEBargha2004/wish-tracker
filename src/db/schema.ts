@@ -1,9 +1,16 @@
-import { relations } from "drizzle-orm";
-import { boolean } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import { boolean, check, integer, jsonb, smallint } from "drizzle-orm/pg-core";
 import { index } from "drizzle-orm/pg-core";
 import { timestamp } from "drizzle-orm/pg-core";
 import { text } from "drizzle-orm/pg-core";
 import { pgTable } from "drizzle-orm/pg-core";
+
+type TEventUserInfo = {
+  avatar?: string;
+  name: string;
+  phone?: string;
+  whatsapp?: string;
+};
 
 export const featureFlags = pgTable("feature-flags", {
   id: text("id").primaryKey(),
@@ -100,3 +107,26 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const events = pgTable(
+  "events",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    user: jsonb("user").$type<TEventUserInfo>(),
+    month: smallint("month").notNull(),
+    day: smallint("day").notNull(),
+    description: text("description"),
+  },
+  (table) => [
+    check(
+      "valid_date_check",
+      sql`
+      (
+        (month in (1,3,5,7,8,10,12) AND day BETWEEN 1 AND 31) OR
+        (month in (2,4,6,9,11) AND day BETWEEN 1 AND 30) OR
+        (month = 2 AND day BETWEEN 1 AND 29)
+      )
+    `
+    ),
+  ]
+);

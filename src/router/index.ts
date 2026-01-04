@@ -1,1 +1,7 @@
-export const router = {};
+import { userEventsByMonths } from "./event";
+
+export const router = {
+  events: {
+    userEventsByMonths,
+  },
+};

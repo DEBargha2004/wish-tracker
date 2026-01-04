@@ -12,12 +12,12 @@ const handler = new RPCHandler<Context>(router, {
 });
 
 async function handleRequest(request: Request) {
-  const response = await handler.handle(request, {
+  const { response } = await handler.handle(request, {
     prefix: "/api/rpc",
     context: await createORPCContext({ request }),
   });
 
-  return response ?? new Response("Not Found");
+  return response ?? new Response("Not Found", { status: 404 });
 }
 
 export const HEAD = handleRequest;

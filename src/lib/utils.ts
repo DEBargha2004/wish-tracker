@@ -17,3 +17,11 @@ export function parseCookie(str: string) {
       return acc;
     }, {});
 }
+
+export const dateFormatter = (
+  date: string,
+  options?: Intl.DateTimeFormatOptions
+) => {
+  const formatter = Intl.DateTimeFormat("en-US", options);
+  return formatter.format(new Date(date));
+};
