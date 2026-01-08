@@ -1,5 +1,12 @@
 import { relations, sql } from "drizzle-orm";
-import { boolean, check, integer, jsonb, smallint } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  date,
+  integer,
+  jsonb,
+  smallint,
+} from "drizzle-orm/pg-core";
 import { index } from "drizzle-orm/pg-core";
 import { timestamp } from "drizzle-orm/pg-core";
 import { text } from "drizzle-orm/pg-core";
@@ -10,6 +17,14 @@ type TEventUserInfo = {
   name: string;
   phone?: string;
   whatsapp?: string;
+};
+
+const timestamps = {
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
 };
 
 export const featureFlags = pgTable("feature-flags", {
@@ -23,11 +38,7 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
+  ...timestamps,
 });
 
 export const session = pgTable(
@@ -36,10 +47,7 @@ export const session = pgTable(
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    ...timestamps,
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
@@ -65,10 +73,7 @@ export const account = pgTable(
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    ...timestamps,
   },
   (table) => [index("account_userId_idx").on(table.userId)]
 );
@@ -80,11 +85,7 @@ export const verification = pgTable(
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    ...timestamps,
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
@@ -116,6 +117,11 @@ export const events = pgTable(
     month: smallint("month").notNull(),
     day: smallint("day").notNull(),
     description: text("description"),
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    ...timestamps,
+    deletedAt: date("deleted_at"),
   },
   (table) => [
     check(
