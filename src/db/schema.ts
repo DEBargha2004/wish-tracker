@@ -12,9 +12,8 @@ import { timestamp } from "drizzle-orm/pg-core";
 import { text } from "drizzle-orm/pg-core";
 import { pgTable } from "drizzle-orm/pg-core";
 
-type TEventUserInfo = {
+export type TEventUserInfo = {
   avatar?: string;
-  name: string;
   phone?: string;
   whatsapp?: string;
 };
@@ -113,9 +112,10 @@ export const events = pgTable(
   "events",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-    user: jsonb("user").$type<TEventUserInfo>(),
+    otherInfo: jsonb("other_info").$type<TEventUserInfo>(),
     month: smallint("month").notNull(),
     day: smallint("day").notNull(),
+    name: text("name").notNull(),
     description: text("description"),
     creatorId: text("creator_id")
       .notNull()

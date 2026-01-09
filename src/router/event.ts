@@ -1,12 +1,20 @@
-import { events } from "@/db/schema";
+import { events, TEventUserInfo } from "@/db/schema";
 import { db } from "@/lib/db";
 import { base } from "@/lib/orpc/orpc";
 import { ORPCError } from "@orpc/client";
 import { desc, sql } from "drizzle-orm";
 import z from "zod";
 import { user } from "../../auth-schema";
+import { eventSchema } from "@/schema/event";
 
-export type TData = { date: string };
+type TUser = {
+  id: string;
+  other_info: TEventUserInfo;
+  month: number;
+  day: number;
+  name: string;
+};
+export type TEventDataByMonth = { date: string; total: number; users: TUser[] };
 
 const userEventsByMonthInput = z.object({
   query: z.string().optional(),
@@ -36,36 +44,68 @@ export const userEventsByMonths = base
       sql`
             WITH time_series AS (
               SELECT d::date AS date FROM GENERATE_SERIES(
-                make_date(${year}, 1, 1),
-                make_date(${year}, 12, 1),
+                MAKE_DATE(${year}, 1, 1),
+                MAKE_DATE(${year}, 12, 1),
                 INTERVAL '1 MONTH'
               ) AS d
-            )
-
-            select ts.date as date, count(${events.id})::int as total,
-            COALESCE(
-              JSON_AGG(
-              json_build_object(
-                'id', ${events.id},
-                'user', ${events.user},
-                'month', ${events.month}
-                )
-              ) filter (where ${events.id} is not null),
-              '[]'::JSON
-            ) as users
-            from time_series ts
-            left join ${events}
-            on make_date(${year},${events.month},${events.day}) >= ts.date
-            and make_date(${year},${events.month},${
+            ),
+            ranked_events AS (
+              select ts.date as ts_date, events.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY ts.date
+                ORDER BY ${desc(events.createdAt)}
+              ) AS rn
+              FROM time_series ts
+              LEFT JOIN ${events} 
+              ON MAKE_DATE(${year},${events.month},${events.day}) >= ts.date
+              AND MAKE_DATE(${year},${events.month},${
         events.day
       }) < ts.date + INTERVAL '1 month'
-            and ${events.creatorId} = ${context.session.user.id}
-            group by ${events.month}, ts.date, ${events.createdAt}
-            order by ${desc(events.createdAt)};
+              AND ${events.creatorId} = ${context.session.user.id}
+            )
+
+            SELECT ts_date as date, count(id)::INT AS total,
+            COALESCE(
+              JSON_AGG(
+                JSON_BUILD_OBJECT(
+                  'id', id,
+                  'other_info', "other_info",
+                  'month', month,
+                  'day' , day,
+                  'name', name
+                )
+                ORDER BY created_at DESC
+              ) FILTER (WHERE id IS NOT NULL AND rn <= 3),
+              '[]'::JSON
+            ) AS users
+            FROM ranked_events
+            GROUP BY ts_date
+            ORDER BY ts_date;
         `
     );
 
-    console.log(JSON.stringify(events_by_months.rows, null, 2));
+    return events_by_months.rows as TEventDataByMonth[];
+  });
 
-    return events_by_months.rows as TData[];
+export const createUserEvent = base
+  .use(authMiddleware)
+  .input(eventSchema)
+  .handler(async ({ context, input }) => {
+    const res = await db
+      .insert(events)
+      .values({
+        creatorId: context.session.user.id,
+        name: input.name,
+        description: input.description,
+        day: Number(input.day),
+        month: Number(input.month),
+        otherInfo: {
+          avatar: input.avatar,
+          phone: input.phone,
+          whatsapp: input.whatsapp,
+        },
+      })
+      .returning();
+
+    return res[0];
   });

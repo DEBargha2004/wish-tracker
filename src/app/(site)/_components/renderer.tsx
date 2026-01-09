@@ -3,8 +3,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn, dateFormatter } from "@/lib/utils";
-import { TData } from "@/router/event";
+import { cn, dateFormatter, getAcronym } from "@/lib/utils";
+import { TEventDataByMonth } from "@/router/event";
 import { Calendar, CalendarPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQueryStates } from "nuqs";
@@ -25,9 +25,15 @@ import {
 } from "@/schema/event";
 import { zodResolver } from "@hookform/resolvers/zod";
 import EventForm from "@/components/custom/forms/event";
+import { client } from "@/lib/orpc/orpc";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-export default function Renderer({ res }: { res: TData[] }) {
-  const [data, setData] = useState<TData[]>(res);
+export default function Renderer({ res }: { res: TEventDataByMonth[] }) {
+  const [data, setData] = useState<TEventDataByMonth[]>(res);
   const [query, setQuery] = useQueryStates(params, { history: "push" });
   const [createEventDialog, setCreateEventDialog] = useState(false);
   const eventForm = useForm<TEventSchema>({
@@ -37,7 +43,11 @@ export default function Renderer({ res }: { res: TData[] }) {
 
   useEvent({ query: query.query, setter: setData });
 
-  const onSubmit = async (data: TEventSchema) => {};
+  const onSubmit = async (data: TEventSchema) => {
+    const res = await client.events.createUserEvent(data);
+
+    setCreateEventDialog(false);
+  };
 
   useEffect(() => {
     if (!createEventDialog) eventForm.reset(getEventDefaultValues());
@@ -101,31 +111,30 @@ export default function Renderer({ res }: { res: TData[] }) {
               </section>
             </div>
             <div className="*:data-[slot=avatar]:ring-background flex -space-x-2 *:data-[slot=avatar]:ring-2">
-              <Avatar>
-                <AvatarImage
-                  src="https://github.com/shadcn.png"
-                  alt="@shadcn"
-                />
-                <AvatarFallback>CN</AvatarFallback>
-              </Avatar>
-              <Avatar>
-                <AvatarImage
-                  src="https://github.com/maxleiter.png"
-                  alt="@maxleiter"
-                />
-                <AvatarFallback>LR</AvatarFallback>
-              </Avatar>
-              <Avatar>
-                <AvatarImage
-                  src="https://github.com/evilrabbit.png"
-                  alt="@evilrabbit"
-                />
-                <AvatarFallback>ER</AvatarFallback>
-              </Avatar>
+              <AvatarGroup data={d} />
             </div>
           </div>
         ))}
       </section>
     </div>
   );
+}
+
+function AvatarGroup({ data }: { data: TEventDataByMonth }) {
+  if (!data.total)
+    return <i className="text-sm text-muted-foreground">No Events</i>;
+
+  return data.users.map((uev) => (
+    <Tooltip key={uev.id}>
+      <TooltipTrigger>
+        <Avatar>
+          <AvatarImage src="https://github.com/evilrabbit.png" alt={uev.name} />
+          <AvatarFallback>{getAcronym(uev.name)}</AvatarFallback>
+        </Avatar>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{uev.name}</p>
+      </TooltipContent>
+    </Tooltip>
+  ));
 }

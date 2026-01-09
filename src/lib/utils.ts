@@ -25,3 +25,13 @@ export const dateFormatter = (
   const formatter = Intl.DateTimeFormat("en-US", options);
   return formatter.format(new Date(date));
 };
+
+export function getAcronym(text: string): string {
+  return text
+    .replace(/\/s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((it) => it[0].toUpperCase())
+    .filter((_, idx, arr) => idx === 0 || idx === arr.length - 1)
+    .join("");
+}
