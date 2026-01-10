@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn, dateFormatter, getAcronym } from "@/lib/utils";
+import { buildImageUrl, cn, dateFormatter, getAcronym } from "@/lib/utils";
 import { TEventDataByMonth } from "@/router/event";
 import { Calendar, CalendarPlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,9 +31,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useYearEvents } from "@/provider/year-events-provider";
+import { isDefinedError, safe } from "@orpc/client";
+import { toast } from "sonner";
 
-export default function Renderer({ res }: { res: TEventDataByMonth[] }) {
-  const [data, setData] = useState<TEventDataByMonth[]>(res);
+export default function Renderer() {
+  const { events, setEvents, addEvent } = useYearEvents();
   const [query, setQuery] = useQueryStates(params, { history: "push" });
   const [createEventDialog, setCreateEventDialog] = useState(false);
   const eventForm = useForm<TEventSchema>({
@@ -41,11 +44,16 @@ export default function Renderer({ res }: { res: TEventDataByMonth[] }) {
     defaultValues: getEventDefaultValues(),
   });
 
-  useEvent({ query: query.query, setter: setData });
+  useEvent({ query: query.query, setter: setEvents });
 
   const onSubmit = async (data: TEventSchema) => {
-    const res = await client.events.createUserEvent(data);
+    const [err, res] = await safe(client.events.createUserEvent(data));
+    if (err) {
+      toast.error(err.message);
+      return;
+    }
 
+    addEvent(res);
     setCreateEventDialog(false);
   };
 
@@ -59,8 +67,9 @@ export default function Renderer({ res }: { res: TEventDataByMonth[] }) {
         <div className="space-y-2">
           <h1 className="text-lg font-medium">Overview of monthly events</h1>
           <p className="text-sm text-muted-foreground">
-            {dateFormatter(data[0].date, { month: "long", year: "numeric" })} -{" "}
-            {dateFormatter(data.at(-1)!.date, {
+            {dateFormatter(events[0].date, { month: "long", year: "numeric" })}{" "}
+            -{" "}
+            {dateFormatter(events.at(-1)!.date, {
               month: "long",
               year: "numeric",
             })}
@@ -89,7 +98,7 @@ export default function Renderer({ res }: { res: TEventDataByMonth[] }) {
         />
       </section>
       <section className="space-y-6 mt-12">
-        {data.map((d, index) => (
+        {events.map((d, index) => (
           <div
             key={index}
             className={cn(
@@ -124,17 +133,41 @@ function AvatarGroup({ data }: { data: TEventDataByMonth }) {
   if (!data.total)
     return <i className="text-sm text-muted-foreground">No Events</i>;
 
-  return data.users.map((uev) => (
-    <Tooltip key={uev.id}>
-      <TooltipTrigger>
-        <Avatar>
-          <AvatarImage src="https://github.com/evilrabbit.png" alt={uev.name} />
-          <AvatarFallback>{getAcronym(uev.name)}</AvatarFallback>
-        </Avatar>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{uev.name}</p>
-      </TooltipContent>
-    </Tooltip>
-  ));
+  return (
+    <>
+      {data.users.slice(0, 3).map((uev) => (
+        <Tooltip key={uev.id}>
+          <TooltipTrigger>
+            <Avatar>
+              {uev.other_info.avatar && (
+                <AvatarImage
+                  src={buildImageUrl(uev.other_info.avatar!)}
+                  alt={uev.name}
+                  className="object-contain"
+                />
+              )}
+              <AvatarFallback>{getAcronym(uev.name)}</AvatarFallback>
+            </Avatar>
+          </TooltipTrigger>
+          <TooltipContent className="text-center">
+            <b>{uev.name}</b>
+            <p>
+              {dateFormatter(
+                `${new Date().getFullYear()}-${uev.month}-${uev.day}`,
+                {
+                  day: "numeric",
+                  month: "short",
+                }
+              )}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ))}
+      {data.total > 3 && (
+        <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-medium ring-2 ring-background">
+          +{data.total - 3}
+        </div>
+      )}
+    </>
+  );
 }

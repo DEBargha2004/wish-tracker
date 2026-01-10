@@ -6,9 +6,10 @@ import { desc, sql } from "drizzle-orm";
 import z from "zod";
 import { user } from "../../auth-schema";
 import { eventSchema } from "@/schema/event";
+import { authMiddleware } from "./middleware/auth.middleware";
 
 type TUser = {
-  id: string;
+  id: number;
   other_info: TEventUserInfo;
   month: number;
   day: number;
@@ -18,21 +19,6 @@ export type TEventDataByMonth = { date: string; total: number; users: TUser[] };
 
 const userEventsByMonthInput = z.object({
   query: z.string().optional(),
-});
-
-const authMiddleware = base.middleware(async ({ context, next }) => {
-  const session = await context.auth.api.getSession({
-    headers: context.headers,
-  });
-
-  if (!session?.user)
-    throw new ORPCError("UNAUTHORIZED", { message: "User Not Logged In" });
-
-  return next({
-    context: {
-      session,
-    },
-  });
 });
 
 export const userEventsByMonths = base
@@ -83,6 +69,8 @@ export const userEventsByMonths = base
             ORDER BY ts_date;
         `
     );
+
+    // console.log(events_by_months.rows);
 
     return events_by_months.rows as TEventDataByMonth[];
   });

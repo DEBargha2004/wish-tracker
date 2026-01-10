@@ -136,3 +136,5 @@ export const events = pgTable(
     ),
   ]
 );
+
+export type TDBEvent = typeof events.$inferSelect;

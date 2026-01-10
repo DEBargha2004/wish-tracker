@@ -1,10 +1,10 @@
 import { client } from "@/lib/orpc/orpc";
-import { TData } from "@/router/event";
+import { TEventDataByMonth } from "@/router/event";
 import { useEffect, useRef } from "react";
 
 type TModuleProps = {
   query: string;
-  setter: (data: TData[]) => void;
+  setter: (data: TEventDataByMonth[]) => void;
 };
 
 export function useEvent(props: TModuleProps) {

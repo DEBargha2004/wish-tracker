@@ -35,3 +35,13 @@ export function getAcronym(text: string): string {
     .filter((_, idx, arr) => idx === 0 || idx === arr.length - 1)
     .join("");
 }
+
+export function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export function buildImageUrl(path: string) {
+  const cloudfront_url = `https://dhyydup1msl69.cloudfront.net`;
+
+  return `${cloudfront_url}/${path}`;
+}
